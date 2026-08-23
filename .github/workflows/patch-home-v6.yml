@@ -1,0 +1,126 @@
+name: Patch apartment comparison content v6
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-home-v6.yml'
+      - 'guri-dasan-home/trigger-v6.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch comparison page
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('guri-dasan-home/index.html')
+          text = path.read_text(encoding='utf-8')
+
+          def patch_object(source, object_id, end_marker, fields):
+              start = source.index(f"id:'{object_id}'")
+              end = source.index(end_marker, start)
+              segment = source[start:end + 1]
+              for field, value in fields.items():
+                  if field in {'pros', 'cons', 'future'}:
+                      pattern = rf"{field}:\[[^\]]*\]"
+                      replacement = f"{field}:{value}"
+                  else:
+                      pattern = rf"{field}:'[^']*'"
+                      replacement = f"{field}:'{value}'"
+                  segment, count = re.subn(pattern, replacement, segment, count=1)
+                  if count != 1:
+                      raise RuntimeError(f'Could not patch {object_id}.{field}')
+              return source[:start] + segment + source[end + 1:]
+
+          text = patch_object(text, 'guri', "},{id:'jigeum'", {
+              'built': '1994년 · 30년 이상 된 구축 · 686세대',
+              'summary': '서울과 가깝고 장자호수공원역을 바로 누리는 입지형 후보. 다만 30년 이상 된 구축이라 주차·배관·설비 노후와 6천만 원 이상의 올수리 비용을 함께 봐야 합니다.',
+              'pros': "['장자호수공원역 8호선 도보권','서울 인접성과 구리 기존 생활권','북측 수택동 일대 정비·개발 기대감']",
+              'cons': "['30년 이상 된 구축으로 주차·배관·설비 노후 부담','인테리어 비용 회수 한계','토평2는 아직 먼 장기 호재라 단기 가격 근거로 과대평가 주의','총투입금이 다산 준신축과 비슷해질 수 있음']",
+              'future': "['북측 수택동 일대 정비·개발 기대감','남측 토평2는 장기적으로 추가 수혜 가능하지만 실제 입주·상권 형성까지 시간이 많이 남음']",
+          })
+
+          text = patch_object(text, 'jigeum', "},{id:'epyeon'", {
+              'type': '9호선 베팅형',
+              'summary': '핵심 투자 포인트는 사실상 9호선 945정거장 기대감입니다. 현재 상권·대형 편의시설·학원가 등 생활 인프라는 진건다산보다 약하며, 9호선이 지연되면 매력의 상당 부분이 약해질 수 있습니다.',
+              'pros': "['9호선 945정거장 약 400m권이 핵심 장점','왕숙2와 연결되는 교통 서사','2020년식 대단지 상품성']",
+              'cons': "['생활 인프라·상권·학원가가 진건다산보다 약함','핵심 호재가 9호선에 집중돼 일정 지연 리스크가 큼','12억 호가는 9호선 기대감 선반영 부담']",
+          })
+
+          company_note = '왕숙1 도시첨단산업단지에는 카카오 디지털허브, 우리금융 금융 R&D센터, 신한금융 AI 인피니티센터 투자협약(MOU)이 체결돼 있습니다. 다만 현재는 완공·입주 완료가 아닌 투자협약·계획 단계입니다.'
+          text = patch_object(text, 'epyeon', "},{id:'hill'", {
+              'summary': '다산역·학교·상권·공원·현대아울렛을 모두 누리는 완성형 생활권 후보. ' + company_note + ' 왕숙1의 일자리 기능이 현실화되면 기존 진건 생활권의 배후수요 확대를 기대할 수 있습니다.',
+              'pros': "['역·학원가·학교·공원·아울렛 균형','1,600세대 대단지와 완성된 인프라','왕숙1 카카오·우리금융·신한금융 투자협약의 간접 수혜 기대']",
+              'cons': "['신규 철도역 직접 호재는 아님','동별 다산역 체감거리 차이','기업 시설은 아직 완공·입주가 아닌 MOU·계획 단계']",
+              'future': "['왕숙1 도시첨단산단이 일자리 중심지로 성장하면 기존 다산진건 상권·교육 수요 확대 가능','남양주 대표 교육·생활권으로 굳어질수록 방어력 상승']",
+          })
+
+          text = patch_object(text, 'hill', "}],\nstations:", {
+              'summary': '브랜드·중앙공원·쾌적성을 선호할 때 강한 안정형 후보. ' + company_note + ' 왕숙1의 기업·일자리 기능이 자리 잡으면 진건다산 전체의 생활권 가치가 높아질 수 있습니다.',
+              'pros': "['브랜드 선호·단지 쾌적성','중앙공원 접근과 낮은 용적률','왕숙1 카카오·우리금융·신한금융 산업·일자리 기대감의 간접 수혜']",
+              'cons': "['역 접근성이 e편한보다 애매','높은 호가 시 프리미엄 과지불','기업 시설은 아직 완공·입주가 아닌 MOU·계획 단계']",
+              'future': "['왕숙1 산업단지와 다산 생활권 성장의 안정적 간접 수혜','급등형보다 가격 방어형']",
+          })
+
+          old_dev = "developments:[['토평2',[37.5748,127.147],2200,'#8b5cf6'],['왕숙2',[37.614,127.204],1700,'#f59e0b'],['왕숙1',[37.667,127.188],3900,'#f97316']]"
+          new_dev = "developments:[['수택동 개발 기대감',[37.6015,127.143],1050,'#2563eb'],['토평2 (중장기·아직 멂)',[37.5748,127.147],2200,'#8b5cf6'],['왕숙2',[37.614,127.204],1700,'#f59e0b'],['왕숙1 · 카카오·우리·신한 투자협약(MOU)',[37.667,127.188],3900,'#f97316']]"
+          if old_dev not in text:
+              raise RuntimeError('Could not patch development map data')
+          text = text.replace(old_dev, new_dev, 1)
+
+          text = text.replace(
+              '원형 음영: 토평2·왕숙 개략 범위',
+              '원형 음영: 수택동 개발 기대감·토평2·왕숙 개략 범위<br>토평2는 실제 생활권 완성까지 시간이 많이 남은 중장기 호재',
+              1,
+          )
+
+          text = text.replace(
+              '945정거장·신미사역·왕숙 연결축과 토평2·왕숙 지구 원은 이해를 돕기 위한 개략 표시입니다. 최종 계약 전에는 최신 공식 계획, 실제 공시가격, 대출 한도, 동·호수별 가격과 수리 범위를 다시 확인하세요.',
+              '945정거장·신미사역·왕숙 연결축과 수택동·토평2·왕숙 지구 원은 이해를 돕기 위한 개략 표시입니다. 토평2는 장기 사업이며, 카카오·우리금융·신한금융 관련 시설도 현재 투자협약(MOU)·계획 단계입니다. <a href="https://lh.or.kr/gallery.es?act=view&b_list=8&bid=0003&list_no=11823&mid=a10502000000" target="_blank" rel="noopener">LH 왕숙 공식자료</a>와 <a href="https://nyj.go.kr/www/selectBbsNttView.do?bbsNo=68&key=2498&nttNo=525645" target="_blank" rel="noopener">남양주시 신한금융 협약자료</a>를 참고하세요. 최종 계약 전에는 최신 공식 계획, 공시가격, 대출 한도, 동·호수별 가격과 수리 범위를 다시 확인하세요.',
+              1,
+          )
+
+          old_tooltip = ".bindTooltip(`${x[0]} · 개략 범위`,{className:'poi-label'}).addTo(groups.developments)"
+          new_tooltip = ".bindTooltip(`${x[0]} · 개략 범위`,{className:'poi-label',permanent:/수택동|토평2|왕숙1/.test(x[0]),direction:'center'}).addTo(groups.developments)"
+          if old_tooltip not in text:
+              raise RuntimeError('Could not patch development labels')
+          text = text.replace(old_tooltip, new_tooltip, 1)
+
+          text = text.replace('2026-08-23 기준 대화 정리본', '2026-08-23 기준 · V6 왕숙1 기업협약 반영', 1)
+
+          required = [
+              '30년 이상 된 구축',
+              '수택동 개발 기대감',
+              '토평2 (중장기·아직 멂)',
+              '생활 인프라·상권·학원가가 진건다산보다 약함',
+              '카카오 디지털허브',
+              '신한금융 AI 인피니티센터',
+              '왕숙1 · 카카오·우리·신한 투자협약(MOU)',
+          ]
+          for value in required:
+              if value not in text:
+                  raise RuntimeError(f'Missing expected value: {value}')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit patched page
+        shell: bash
+        run: |
+          git config user.name "chatgpt-deployer"
+          git config user.email "actions@users.noreply.github.com"
+          git add guri-dasan-home/index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add Wangsu corporate investment plans and area caveats"
+            git push
+          fi
